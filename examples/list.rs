@@ -5,7 +5,7 @@ use structopt::StructOpt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf};
 use tokio::net::TcpStream;
 
-use nntp::response::{parse_newsgroup_list, Response};
+use nntp::response::{parse_list, NewsgroupInfo, Capability, Response};
 
 #[derive(StructOpt)]
 struct Args {
@@ -42,8 +42,12 @@ async fn read_task(reader: ReadHalf<TcpStream>) -> Result<()> {
                 println!("{:?}", response);
                 match response {
                     Response::InformationFollows { .. } => {
-                        let newsgroup_list = parse_newsgroup_list(&mut lines).await?;
+                        let newsgroup_list: Vec<NewsgroupInfo> = parse_list(&mut lines).await?;
                         println!("{:?}", newsgroup_list);
+                    },
+                    Response::CapabilitiesFollow { .. } => {
+                        let capabilities: Vec<Capability> = parse_list(&mut lines).await?;
+                        println!("{:?}", capabilities);
                     },
                     _ => {
                     }
@@ -64,6 +68,7 @@ async fn connect(
     let stream = TcpStream::connect(addr).await?;
     let (reader, mut writer) = tokio::io::split(stream);
 
+    writer.write_all(b"CAPABILITIES\r\n").await?;
     writer.write_all(b"LIST\r\n").await?;
     writer.write_all(b"QUIT\r\n").await?;
 
