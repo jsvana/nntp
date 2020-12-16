@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::Result;
 use thiserror::Error;
 use tokio::io::{AsyncBufRead, Lines};
 
@@ -457,17 +458,15 @@ pub enum ListParseState {
 pub enum ParseListError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
-    #[error("invalid item \"{line}\": {error}")]
-    InvalidItem { line: String, error: String },
     #[error("newsgroup list never terminated")]
     UnfinishedNewsgroupList,
 }
 
-pub async fn parse_list<T, U>(lines: &mut Lines<T>) -> Result<Vec<U>, ParseListError>
+pub async fn parse_list<T, U>(lines: &mut Lines<T>) -> Result<Vec<U>>
 where
     T: AsyncBufRead + Unpin,
     U: FromStr,
-    <U as std::str::FromStr>::Err: std::fmt::Display,
+    <U as std::str::FromStr>::Err: std::fmt::Display + std::error::Error + Send + Sync + 'static,
 {
     let mut items = Vec::new();
     let mut state = ListParseState::Parsing;
@@ -478,20 +477,14 @@ where
                 state = ListParseState::Complete;
                 break;
             }
-            _ => match line.parse::<U>() {
-                Ok(item) => items.push(item),
-                Err(e) => {
-                    return Err(ParseListError::InvalidItem {
-                        line,
-                        error: e.to_string(),
-                    });
-                }
-            },
+            _ => {
+                items.push(line.parse::<U>()?);
+            }
         }
     }
 
     match state {
-        ListParseState::Parsing => Err(ParseListError::UnfinishedNewsgroupList),
+        ListParseState::Parsing => Err(ParseListError::UnfinishedNewsgroupList.into()),
         ListParseState::Complete => Ok(items),
     }
 }
