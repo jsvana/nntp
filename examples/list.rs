@@ -5,7 +5,8 @@ use structopt::StructOpt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf};
 use tokio::net::TcpStream;
 
-use nntp::response::{parse_list, NewsgroupInfo, Capability, Response};
+use nntp::command::Command;
+use nntp::response::{parse_list, Capability, NewsgroupInfo, Response};
 
 #[derive(StructOpt)]
 struct Args {
@@ -15,7 +16,11 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::from_args();
-    let addr = args.host_port.to_socket_addrs()?.next().ok_or_else(|| format_err!("no usable IP addresses found for {}", args.host_port))?;
+    let addr = args
+        .host_port
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| format_err!("no usable IP addresses found for {}", args.host_port))?;
 
     connect(&addr).await?;
 
@@ -44,13 +49,12 @@ async fn read_task(reader: ReadHalf<TcpStream>) -> Result<()> {
                     Response::InformationFollows { .. } => {
                         let newsgroup_list: Vec<NewsgroupInfo> = parse_list(&mut lines).await?;
                         println!("{:?}", newsgroup_list);
-                    },
+                    }
                     Response::CapabilitiesFollow { .. } => {
                         let capabilities: Vec<Capability> = parse_list(&mut lines).await?;
                         println!("{:?}", capabilities);
-                    },
-                    _ => {
                     }
+                    _ => {}
                 }
             }
             Err(e) => {
@@ -62,15 +66,13 @@ async fn read_task(reader: ReadHalf<TcpStream>) -> Result<()> {
     Ok(())
 }
 
-async fn connect(
-    addr: &SocketAddr,
-) -> Result<()> {
+async fn connect(addr: &SocketAddr) -> Result<()> {
     let stream = TcpStream::connect(addr).await?;
     let (reader, mut writer) = tokio::io::split(stream);
 
-    writer.write_all(b"CAPABILITIES\r\n").await?;
-    writer.write_all(b"LIST\r\n").await?;
-    writer.write_all(b"QUIT\r\n").await?;
+    Command::Capabilities.write_to_stream(&mut writer).await?;
+    Command::List.write_to_stream(&mut writer).await?;
+    Command::Quit.write_to_stream(&mut writer).await?;
 
     read_task(reader).await?;
 

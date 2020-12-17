@@ -1,5 +1,9 @@
 use std::fmt;
 
+use anyhow::Result;
+use tokio::io::{AsyncWriteExt, WriteHalf};
+use tokio::net::TcpStream;
+
 pub enum Command {
     /*
        +-------------------+-----------------------+---------------+
@@ -40,6 +44,13 @@ pub enum Command {
     */
     Capabilities,
     List,
+    Quit,
+}
+
+impl Command {
+    pub async fn write_to_stream(&self, stream: &mut WriteHalf<TcpStream>) -> Result<()> {
+        Ok(stream.write_all(format!("{}\r\n", self).as_bytes()).await?)
+    }
 }
 
 impl fmt::Display for Command {
@@ -47,6 +58,7 @@ impl fmt::Display for Command {
         match self {
             Command::Capabilities => write!(f, "CAPABILITIES"),
             Command::List => write!(f, "LIST"),
+            Command::Quit => write!(f, "QUIT"),
         }
     }
 }
