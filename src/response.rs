@@ -324,14 +324,13 @@ pub enum NewsgroupStatus {
     PostingPermitted,
     PostingNotPermitted,
     PostingModerated,
+    Unknown(String),
 }
 
 #[derive(Debug, Error)]
 pub enum ParseNewsgroupStatusError {
     #[error("given line is empty")]
     EmptyLine,
-    #[error("unknown newsgroup status \"{0}\"")]
-    UnknownStatus(String),
 }
 
 impl FromStr for NewsgroupStatus {
@@ -343,7 +342,7 @@ impl FromStr for NewsgroupStatus {
             "n" => Ok(NewsgroupStatus::PostingNotPermitted),
             "m" => Ok(NewsgroupStatus::PostingModerated),
             "" => Err(ParseNewsgroupStatusError::EmptyLine),
-            _ => Err(ParseNewsgroupStatusError::UnknownStatus(line.to_string())),
+            status => Ok(NewsgroupStatus::Unknown(status.to_string())),
         }
     }
 }

@@ -4,6 +4,11 @@ use anyhow::Result;
 use tokio::io::{AsyncWriteExt, WriteHalf};
 use tokio::net::TcpStream;
 
+pub enum AuthPart {
+    User(String),
+    Password(String),
+}
+
 pub enum Command {
     /*
        +-------------------+-----------------------+---------------+
@@ -45,6 +50,8 @@ pub enum Command {
     Capabilities,
     List,
     Quit,
+
+    AuthInfo(AuthPart),
 }
 
 impl Command {
@@ -59,6 +66,14 @@ impl fmt::Display for Command {
             Command::Capabilities => write!(f, "CAPABILITIES"),
             Command::List => write!(f, "LIST"),
             Command::Quit => write!(f, "QUIT"),
+
+            Command::AuthInfo(auth_part) => {
+                write!(f, "AUTHINFO ")?;
+                match auth_part {
+                    AuthPart::User(user) => write!(f, "USER {}", user),
+                    AuthPart::Password(password) => write!(f, "PASS {}", password),
+                }
+            }
         }
     }
 }
