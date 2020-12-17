@@ -457,8 +457,8 @@ pub enum ListParseState {
 pub enum ParseListError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
-    #[error("newsgroup list never terminated")]
-    UnfinishedNewsgroupList,
+    #[error("list never terminated")]
+    UnfinishedList,
 }
 
 pub async fn parse_list<T, U>(lines: &mut Lines<T>) -> Result<Vec<U>>
@@ -483,7 +483,7 @@ where
     }
 
     match state {
-        ListParseState::Parsing => Err(ParseListError::UnfinishedNewsgroupList.into()),
+        ListParseState::Parsing => Err(ParseListError::UnfinishedList.into()),
         ListParseState::Complete => Ok(items),
     }
 }
