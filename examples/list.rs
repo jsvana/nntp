@@ -5,7 +5,7 @@ use structopt::StructOpt;
 use tokio::io::{AsyncBufReadExt, BufReader, ReadHalf};
 use tokio::net::TcpStream;
 
-use nntp::command::{AuthPart, Command};
+use nntp::command::{AuthPart, Command, WriteCommand};
 use nntp::response::{parse_list, Capability, NewsgroupInfo, Response};
 
 #[derive(StructOpt)]
@@ -17,6 +17,9 @@ struct Args {
 
     #[structopt(long)]
     password: Option<String>,
+
+    #[structopt(long)]
+    newsgroup: String,
 }
 
 struct UserPassword {
@@ -44,7 +47,7 @@ async fn main() -> Result<()> {
         (None, None) => None,
     };
 
-    connect(addr, user_pass).await?;
+    connect(addr, user_pass, args.newsgroup).await?;
 
     Ok(())
 }
@@ -91,21 +94,26 @@ async fn read_task(reader: ReadHalf<TcpStream>) -> Result<()> {
     Ok(())
 }
 
-async fn connect(addr: SocketAddr, user_pass: Option<UserPassword>) -> Result<()> {
+async fn connect(
+    addr: SocketAddr,
+    user_pass: Option<UserPassword>,
+    newsgroup: String,
+) -> Result<()> {
     let stream = TcpStream::connect(addr).await?;
     let (reader, mut writer) = tokio::io::split(stream);
 
-    Command::Capabilities.write_to_stream(&mut writer).await?;
+    writer.write_command(Command::Capabilities).await?;
     if let Some(user_pass) = user_pass {
-        Command::AuthInfo(AuthPart::User(user_pass.user))
-            .write_to_stream(&mut writer)
+        writer
+            .write_command(Command::AuthInfo(AuthPart::User(user_pass.user)))
             .await?;
-        Command::AuthInfo(AuthPart::Password(user_pass.password))
-            .write_to_stream(&mut writer)
+        writer
+            .write_command(Command::AuthInfo(AuthPart::Password(user_pass.password)))
             .await?;
     }
-    Command::List.write_to_stream(&mut writer).await?;
-    Command::Quit.write_to_stream(&mut writer).await?;
+    writer.write_command(Command::Group(newsgroup)).await?;
+    //writer.write_command(Command::List).await?;
+    writer.write_command(Command::Quit).await?;
 
     read_task(reader).await?;
 

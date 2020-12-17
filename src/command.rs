@@ -1,6 +1,7 @@
 use std::fmt;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use tokio::io::{AsyncWriteExt, WriteHalf};
 use tokio::net::TcpStream;
 
@@ -51,12 +52,22 @@ pub enum Command {
     List,
     Quit,
 
+    Group(String),
+
     AuthInfo(AuthPart),
 }
 
-impl Command {
-    pub async fn write_to_stream(&self, stream: &mut WriteHalf<TcpStream>) -> Result<()> {
-        Ok(stream.write_all(format!("{}\r\n", self).as_bytes()).await?)
+#[async_trait]
+pub trait WriteCommand {
+    async fn write_command(&mut self, command: Command) -> Result<()>;
+}
+
+#[async_trait]
+impl WriteCommand for WriteHalf<TcpStream> {
+    async fn write_command(&mut self, command: Command) -> Result<()> {
+        Ok(self
+            .write_all(format!("{}\r\n", command).as_bytes())
+            .await?)
     }
 }
 
@@ -66,6 +77,8 @@ impl fmt::Display for Command {
             Command::Capabilities => write!(f, "CAPABILITIES"),
             Command::List => write!(f, "LIST"),
             Command::Quit => write!(f, "QUIT"),
+
+            Command::Group(name) => write!(f, "GROUP {}", name),
 
             Command::AuthInfo(auth_part) => {
                 write!(f, "AUTHINFO ")?;

@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "*"
+async-trait = "*"
 thiserror = "*"
 tokio = { version = "*", features = ["full"] }
 
